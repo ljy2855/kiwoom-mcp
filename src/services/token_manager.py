@@ -6,8 +6,8 @@ import asyncio
 from datetime import datetime, timedelta
 from typing import Optional
 
-from config import Settings, get_settings
-from models import TokenIssueResponse
+from ..config import Settings, get_settings
+from ..models import TokenIssueResponse
 
 
 class TokenManager:

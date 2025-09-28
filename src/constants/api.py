@@ -99,7 +99,6 @@ MARKET_DATA_APIS = {
 ACCOUNT_APIS = {
     "DAILY_BALANCE_PROFIT": APIInfo("ka01690", "일별잔고수익률", APICategory.ACCOUNT, "계좌", "/api/dostk/acnt"),
     "UNEXECUTED": APIInfo("ka10071", "미체결요청", APICategory.ACCOUNT, "계좌", "/api/dostk/acnt"),
-    "EXECUTED": APIInfo("ka10072", "체결요청", APICategory.ACCOUNT, "계좌", "/api/dostk/acnt"),
     "DAILY_REALIZED_PROFIT": APIInfo("ka10073", "당일실현손익상세요청", APICategory.ACCOUNT, "계좌", "/api/dostk/acnt"),
     "ACCOUNT_PROFIT": APIInfo("ka10081", "계좌수익률요청", APICategory.ACCOUNT, "계좌", "/api/dostk/acnt"),
     "DAILY_TRADING_LOG": APIInfo("ka10169", "당일매매일지요청", APICategory.ACCOUNT, "계좌", "/api/dostk/acnt"),
@@ -119,6 +118,7 @@ ACCOUNT_APIS = {
     "DAILY_ACCOUNT_PROFIT_DETAIL": APIInfo("kt00016", "일별계좌수익률상세현황요청", APICategory.ACCOUNT, "계좌", "/api/dostk/acnt"),
     "ACCOUNT_DAILY_STATUS": APIInfo("kt00017", "계좌별당일현황요청", APICategory.ACCOUNT, "계좌", "/api/dostk/acnt"),
     "ACCOUNT_EVALUATION_BALANCE": APIInfo("kt00018", "계좌평가잔고내역요청", APICategory.ACCOUNT, "계좌", "/api/dostk/acnt"),
+    "DAILY_REALIZED_PROFIT_BY_STOCK": APIInfo("ka10072", "일자별종목별실현손익요청", APICategory.ACCOUNT, "계좌", "/api/dostk/acnt"),
 }
 
 # Order APIs

@@ -7,9 +7,9 @@ from typing import Any
 
 import httpx
 
-from config import Settings
-from models import TokenIssueResponse
-from constants import OAUTH_APIS
+from ..config import Settings
+from ..models import TokenIssueResponse
+from ..constants import OAUTH_APIS
 from .token_manager import get_token_manager
 
 

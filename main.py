@@ -1,4 +1,4 @@
-"""Entrypoint for running the Kiwoom MCP server."""
+"""Entrypoint for running the Kiwoom MCP stdio server."""
 
 from src.mcp_server import mcp_server
 
