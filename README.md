@@ -47,15 +47,4 @@ The server automatically handles token management:
 
 The server uses centralized API constants for all Kiwoom OpenAPI endpoints:
 
-- **OAuth APIs**: Token issuance and revocation
-- **Stock Info APIs**: Basic stock information, trader info, execution details
-- **Market Data APIs**: Quotes, charts, price data
-- **Account APIs**: Balance, positions, profit/loss
-- **Order APIs**: Buy/sell orders, modifications, cancellations
-- **Chart APIs**: Various timeframe charts (tick, minute, daily, etc.)
-
-Each API call includes:
-- **API ID**: Unique identifier for the endpoint
-- **API Name**: Descriptive name in Korean
-- **Category**: Functional grouping (OAuth, Stock Info, etc.)
-- **URL**: Endpoint path
+[API list](./kiwoom_api_spec.md)
