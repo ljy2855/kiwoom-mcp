@@ -30,16 +30,6 @@ class KiwoomMCPServer:
         """Setup MCP tools for Kiwoom OpenAPI operations."""
         
         @self.mcp.tool()
-        async def get_accounts() -> Dict[str, Any]:
-            """
-            Get account information from Kiwoom OpenAPI.
-            
-            Returns:
-                Account information including account numbers and balances
-            """
-            return await account.get_accounts(self._client)
-
-        @self.mcp.tool()
         async def get_daily_realized_profit_by_stock(
             stock_code: str,
             start_date: str,
