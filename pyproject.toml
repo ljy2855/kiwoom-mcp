@@ -8,7 +8,12 @@ dependencies = [
     "fastmcp>=0.1.0",
     "httpx>=0.27.0",
     "pydantic-settings>=2.2.1",
+    "starlette>=0.48.0",
+    "uvicorn>=0.30.0",
 ]
+
+[project.scripts]
+kiwoom-strategy-cycle = "src.strategy_cycle:cli"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

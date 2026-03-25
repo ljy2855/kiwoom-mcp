@@ -8,6 +8,27 @@ MCP (Model Context Protocol) server that provides Kiwoom OpenAPI
 - Kiwoom OpenAPI appkey and secretkey
 - FastMCP package
 
+## Environment Setup
+
+The server supports both live trading and mock trading credentials.
+
+For development, enable the mock trading environment in `.env`:
+
+```dotenv
+KIWOOM_USE_MOCK=true
+KIWOOM_MOCK_APPKEY=your-mock-app-key
+KIWOOM_MOCK_SECRETKEY=your-mock-secret-key
+```
+
+For live trading, switch mock mode off and provide the live credentials:
+
+```dotenv
+KIWOOM_USE_MOCK=false
+KIWOOM_APPKEY=your-live-app-key
+KIWOOM_SECRETKEY=your-live-secret-key
+```
+
+If `KIWOOM_USE_MOCK=true`, all authenticated REST calls and order tools are routed to `https://mockapi.kiwoom.com`.
 
 ## Project layout
 
@@ -95,28 +116,49 @@ The server currently exposes the following MCP tools.
   - Args: `all_stk_tp`, `trde_tp`, `stex_tp`, optional `stk_cd`
   - Returns currently unexecuted orders
 
-### Live Order Tools
+### Market / Strategy Tools
 
-These tools submit real live orders. They are not simulation tools.
+- `get_market_snapshot`
+  - Aggregates KOSPI/KOSDAQ index snapshots, sector overview, top gainers, top volume, top traded value, and optional watchlist details
+  - Args: optional `watchlist`, `leaders_limit`
+  - Use this as the main market-context input for hourly automations
+
+- `plan_intraday_momentum_strategy`
+  - Dry-run planner for a conservative intraday momentum strategy
+  - Args: optional `watchlist`, `leaders_limit`, `candidate_limit`, `max_positions`, `max_new_positions`, `position_budget_pct`
+  - Applies market-regime filtering, leaderboard-based candidate selection, and stop-loss / take-profit rules without sending orders
+
+- `run_mock_intraday_momentum_strategy`
+  - Mock-only execution wrapper around the same strategy
+  - Required args: `confirm_mock_strategy_execution=true`
+  - Optional args: same as `plan_intraday_momentum_strategy`
+  - Refuses to place orders unless `KIWOOM_USE_MOCK=true`
+
+### Order Submission Tools
+
+These tools submit orders to the currently configured Kiwoom environment.
+When `KIWOOM_USE_MOCK=true`, they go to the mock investment environment.
+When `KIWOOM_USE_MOCK=false`, they go to the live trading environment.
 
 - `place_stock_buy_order`
   - API `kt10000`
   - Required args: `confirm_live_order=true`, `stk_cd`, `ord_qty`, `order_type_code`
-  - Optional args: `ord_uv`, `cond_uv`
+  - Optional args: `dmst_stex_tp` (default `KRX`), `ord_uv`, `cond_uv`
 
 - `place_stock_sell_order`
   - API `kt10001`
   - Required args: `confirm_live_order=true`, `stk_cd`, `ord_qty`, `order_type_code`
-  - Optional args: `ord_uv`, `cond_uv`
+  - Optional args: `dmst_stex_tp` (default `KRX`), `ord_uv`, `cond_uv`
 
 - `modify_stock_order`
   - API `kt10002`
   - Required args: `confirm_live_order=true`, `orig_ord_no`, `stk_cd`, `mdfy_qty`, `mdfy_uv`
-  - Optional args: `mdfy_cond_uv`
+  - Optional args: `dmst_stex_tp` (default `KRX`), `mdfy_cond_uv`
 
 - `cancel_stock_order`
   - API `kt10003`
   - Required args: `confirm_live_order=true`, `orig_ord_no`, `stk_cd`, `cncl_qty`
+  - Optional args: `dmst_stex_tp` (default `KRX`)
   - Note: `cncl_qty="0"` cancels the remaining quantity entirely
 
 ## Development Checks
@@ -125,3 +167,58 @@ These tools submit real live orders. They are not simulation tools.
   ```bash
   uv run pytest -q
   ```
+
+## Dashboard
+
+The project also includes a web dashboard for account overview and trade history.
+
+- Start the dashboard:
+  ```bash
+  uv run python main_dashboard.py
+  ```
+- Open:
+  - [http://127.0.0.1:8001](http://127.0.0.1:8001)
+- JSON data endpoint:
+  - [http://127.0.0.1:8001/api/dashboard](http://127.0.0.1:8001/api/dashboard)
+
+The dashboard reads the same `.env` settings as the MCP server, so with `KIWOOM_USE_MOCK=true` it will query the mock investment environment.
+
+## Strategy Notes
+
+The built-in strategy is intentionally conservative.
+
+- It buys only when the market regime is risk-on based on KOSPI/KOSDAQ breadth and index performance
+- It prefers liquid momentum names from gainers / volume / traded-value leaderboards
+- It exits on a fixed stop-loss (`-3%`), take-profit (`+6%`), or weak-market de-risking rule
+- It is designed for mock-trading validation first, not for unattended live trading
+
+## Direct Strategy Runner
+
+For automation, the recommended path is to run the strategy directly without starting the MCP server.
+
+- Dry-run one cycle:
+  ```bash
+  uv run python main_strategy_cycle.py
+  ```
+- Dry-run with a custom watchlist:
+  ```bash
+  uv run python main_strategy_cycle.py --watchlist 005930,000660,035420
+  ```
+- Print raw JSON:
+  ```bash
+  uv run python main_strategy_cycle.py --json
+  ```
+- Execute mock orders:
+  ```bash
+  KIWOOM_USE_MOCK=true uv run python main_strategy_cycle.py --execute-mock-orders
+  ```
+
+There is also a console script entrypoint:
+
+```bash
+uv run kiwoom-strategy-cycle --json
+```
+
+Safety rule:
+
+- `--execute-mock-orders` is refused unless `KIWOOM_USE_MOCK=true`
