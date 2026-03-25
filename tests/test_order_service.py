@@ -77,6 +77,7 @@ def test_buy_order_uses_kt10000_contract() -> None:
         "stk_cd": "005930",
         "ord_qty": "1",
         "trde_tp": "0",
+        "dmst_stex_tp": "KRX",
         "ord_uv": "70000",
     }
 
@@ -104,3 +105,4 @@ def test_cancel_order_business_error_is_reported() -> None:
     assert result["return_code"] == 2
     assert result["message"] == "입력 값 오류입니다."
     assert result["cancel_order_result"]["return_msg"] == "입력 값 오류입니다."
+    assert client.calls[0]["json"]["dmst_stex_tp"] == "KRX"

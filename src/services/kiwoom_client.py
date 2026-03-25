@@ -19,10 +19,8 @@ class KiwoomClient:
     def __init__(self, settings: Settings):
         self._settings = settings
         self._token_manager = get_token_manager()
-        # Use mock URL if specified, otherwise use production URL
-        base_url = str(settings.mock_base_url) if settings.use_mock else str(settings.base_url)
         self._client = httpx.AsyncClient(
-            base_url=base_url,
+            base_url=settings.active_base_url,
             timeout=settings.timeout_seconds,
             headers={"User-Agent": f"kiwoom-mcp/{uuid.uuid4()}"},
         )
@@ -41,8 +39,8 @@ class KiwoomClient:
 
         payload = {
             "grant_type": grant_type,
-            "appkey": self._settings.appkey,
-            "secretkey": self._settings.secretkey,
+            "appkey": self._settings.active_appkey,
+            "secretkey": self._settings.active_secretkey,
         }
 
         # Get token issuance API info

@@ -9,7 +9,7 @@ from pydantic import Field
 
 from .config import get_settings
 from .services.kiwoom_client import KiwoomClient
-from .services import account, order
+from .services import account, market, order, strategy
 
 DateYmd = Annotated[
     str,
@@ -39,6 +39,10 @@ ConfirmLiveOrder = Annotated[
     Literal[True],
     Field(description="실제 주문 실행 확인. 반드시 true여야만 실주문 요청을 전송합니다"),
 ]
+ConfirmMockStrategyExecution = Annotated[
+    Literal[True],
+    Field(description="모의투자 전략 주문 실행 확인. KIWOOM_USE_MOCK=true일 때만 true로 주문을 전송합니다"),
+]
 OrderTypeCode = Annotated[
     Literal["0", "3", "5", "61", "62", "81", "6", "7", "10", "13", "16", "20", "23", "26", "28", "29", "30", "31"],
     Field(
@@ -48,6 +52,30 @@ OrderTypeCode = Annotated[
         )
     ),
 ]
+StrategyWatchlist = Annotated[
+    list[StockCode] | None,
+    Field(description="추가 감시 대상 6자리 종목코드 배열. 비우면 기본 관심종목과 보유종목을 사용"),
+]
+LeadersLimit = Annotated[
+    int,
+    Field(description="랭킹 기반 후보 수집 개수", ge=3, le=30),
+]
+CandidateLimit = Annotated[
+    int,
+    Field(description="상세 분석할 후보 최대 개수", ge=1, le=10),
+]
+MaxPositions = Annotated[
+    int,
+    Field(description="최대 동시 보유 종목 수", ge=1, le=10),
+]
+MaxNewPositions = Annotated[
+    int,
+    Field(description="한 번의 실행에서 새로 열 수 있는 최대 포지션 수", ge=1, le=5),
+]
+PositionBudgetPercent = Annotated[
+    int,
+    Field(description="종목당 예산 비중(%)", ge=1, le=50),
+]
 
 
 class KiwoomMCPServer:
@@ -55,7 +83,8 @@ class KiwoomMCPServer:
 
     def __init__(self):
         self.mcp = FastMCP("kiwoom-mcp")
-        self._client = KiwoomClient(get_settings())
+        self._settings = get_settings()
+        self._client = KiwoomClient(self._settings)
         self._setup_resources()
         self._setup_tools()
 
@@ -283,22 +312,109 @@ class KiwoomMCPServer:
             )
 
         @self.mcp.tool()
+        async def get_market_snapshot(
+            watchlist: StrategyWatchlist = None,
+            leaders_limit: LeadersLimit = 10,
+        ) -> dict[str, Any]:
+            """
+            시장 데이터 집계 도구.
+
+            KOSPI/KOSDAQ 지수, 업종 개요, 상승률/거래량/거래대금 상위, 감시 종목 상세 시세를 한 번에 조회합니다.
+
+            Use this tool when:
+            - automation 한 번의 실행에서 시장 전반 분위기를 빠르게 파악하고 싶을 때
+            - 개별 종목보다 먼저 지수/업종/랭킹 데이터를 보고 싶을 때
+            """
+            return await market.get_market_snapshot(
+                self._client,
+                watchlist=watchlist,
+                leaders_limit=leaders_limit,
+            )
+
+        @self.mcp.tool()
+        async def plan_intraday_momentum_strategy(
+            watchlist: StrategyWatchlist = None,
+            leaders_limit: LeadersLimit = 10,
+            candidate_limit: CandidateLimit = 5,
+            max_positions: MaxPositions = 3,
+            max_new_positions: MaxNewPositions = 1,
+            position_budget_pct: PositionBudgetPercent = 10,
+        ) -> dict[str, Any]:
+            """
+            규칙 기반 장중 모멘텀 전략 계획 도구.
+
+            이 도구는 주문을 보내지 않고, 시장 레짐 판단과 후보 종목 스코어링을 통해
+            매수/매도 계획만 생성합니다.
+
+            Strategy outline:
+            - KOSPI/KOSDAQ breadth와 지수 수익률로 risk-on / neutral / risk-off 판정
+            - 유동성 높은 상승 종목만 후보로 사용
+            - 손절(-3%), 익절(+6%), 약세장 디리스킹 규칙 적용
+            """
+            return await strategy.plan_intraday_momentum_strategy(
+                self._client,
+                self._settings,
+                watchlist=watchlist,
+                leaders_limit=leaders_limit,
+                candidate_limit=candidate_limit,
+                max_positions=max_positions,
+                max_new_positions=max_new_positions,
+                position_budget_pct=position_budget_pct,
+            )
+
+        @self.mcp.tool()
+        async def run_mock_intraday_momentum_strategy(
+            confirm_mock_strategy_execution: ConfirmMockStrategyExecution,
+            watchlist: StrategyWatchlist = None,
+            leaders_limit: LeadersLimit = 10,
+            candidate_limit: CandidateLimit = 5,
+            max_positions: MaxPositions = 3,
+            max_new_positions: MaxNewPositions = 1,
+            position_budget_pct: PositionBudgetPercent = 10,
+        ) -> dict[str, Any]:
+            """
+            MOCK ONLY: 규칙 기반 장중 모멘텀 전략 실행 도구.
+
+            Important:
+            - `KIWOOM_USE_MOCK=true`일 때만 주문을 전송합니다
+            - 기본적으로 손절/익절/유동성 필터가 내장된 보수적 전략입니다
+            - 수익을 보장하지 않으며, mock 검증용으로 사용해야 합니다
+            """
+            return await strategy.plan_intraday_momentum_strategy(
+                self._client,
+                self._settings,
+                watchlist=watchlist,
+                leaders_limit=leaders_limit,
+                candidate_limit=candidate_limit,
+                max_positions=max_positions,
+                max_new_positions=max_new_positions,
+                position_budget_pct=position_budget_pct,
+                execute_orders=True,
+                confirm_mock_orders=confirm_mock_strategy_execution,
+            )
+
+        @self.mcp.tool()
         async def place_stock_buy_order(
             confirm_live_order: ConfirmLiveOrder,
             stk_cd: StockCode,
             ord_qty: NumericText,
             order_type_code: OrderTypeCode,
+            dmst_stex_tp: Annotated[
+                Literal["KRX", "NXT"],
+                Field(description="국내거래소구분. 기본값은 KRX"),
+            ] = "KRX",
             ord_uv: OptionalNumericText = None,
             cond_uv: OptionalNumericText = None,
         ) -> dict[str, Any]:
             """
-            LIVE ORDER: API `kt10000` 주식 매수주문.
+            ORDER SUBMISSION: API `kt10000` 주식 매수주문.
 
-            실제 매수 주문을 전송합니다. 시뮬레이션용이 아닙니다.
+            현재 설정된 Kiwoom 환경으로 매수 주문을 전송합니다.
 
             Important:
-            - 이 도구는 실거래 주문을 발생시킵니다
+            - `KIWOOM_USE_MOCK=true`면 모의투자 환경, 아니면 실거래 환경으로 전송됩니다
             - `confirm_live_order`는 반드시 `true`여야 합니다
+            - `dmst_stex_tp`는 기본값 `KRX`를 사용합니다
             - 시장가 주문이면 `order_type_code="3"`를 사용하고 `ord_uv`는 비워둘 수 있습니다
             - 지정가 주문이면 `order_type_code="0"`와 `ord_uv`를 함께 넣으세요
             """
@@ -307,6 +423,7 @@ class KiwoomMCPServer:
                 stk_cd=stk_cd,
                 ord_qty=ord_qty,
                 order_type_code=order_type_code,
+                dmst_stex_tp=dmst_stex_tp,
                 ord_uv=ord_uv or "",
                 cond_uv=cond_uv or "",
             )
@@ -317,17 +434,22 @@ class KiwoomMCPServer:
             stk_cd: StockCode,
             ord_qty: NumericText,
             order_type_code: OrderTypeCode,
+            dmst_stex_tp: Annotated[
+                Literal["KRX", "NXT"],
+                Field(description="국내거래소구분. 기본값은 KRX"),
+            ] = "KRX",
             ord_uv: OptionalNumericText = None,
             cond_uv: OptionalNumericText = None,
         ) -> dict[str, Any]:
             """
-            LIVE ORDER: API `kt10001` 주식 매도주문.
+            ORDER SUBMISSION: API `kt10001` 주식 매도주문.
 
-            실제 매도 주문을 전송합니다. 시뮬레이션용이 아닙니다.
+            현재 설정된 Kiwoom 환경으로 매도 주문을 전송합니다.
 
             Important:
-            - 이 도구는 실거래 주문을 발생시킵니다
+            - `KIWOOM_USE_MOCK=true`면 모의투자 환경, 아니면 실거래 환경으로 전송됩니다
             - `confirm_live_order`는 반드시 `true`여야 합니다
+            - `dmst_stex_tp`는 기본값 `KRX`를 사용합니다
             - 시장가 주문이면 `order_type_code="3"`를 사용하고 `ord_uv`는 비워둘 수 있습니다
             - 지정가 주문이면 `order_type_code="0"`와 `ord_uv`를 함께 넣으세요
             """
@@ -336,6 +458,7 @@ class KiwoomMCPServer:
                 stk_cd=stk_cd,
                 ord_qty=ord_qty,
                 order_type_code=order_type_code,
+                dmst_stex_tp=dmst_stex_tp,
                 ord_uv=ord_uv or "",
                 cond_uv=cond_uv or "",
             )
@@ -347,12 +470,20 @@ class KiwoomMCPServer:
             stk_cd: StockCode,
             mdfy_qty: NumericText,
             mdfy_uv: NumericText,
+            dmst_stex_tp: Annotated[
+                Literal["KRX", "NXT"],
+                Field(description="국내거래소구분. 기본값은 KRX"),
+            ] = "KRX",
             mdfy_cond_uv: OptionalNumericText = None,
         ) -> dict[str, Any]:
             """
-            LIVE ORDER: API `kt10002` 주식 정정주문.
+            ORDER SUBMISSION: API `kt10002` 주식 정정주문.
 
-            기존 주문을 정정합니다. 실주문 변경이므로 주의해서 사용해야 합니다.
+            현재 설정된 Kiwoom 환경의 기존 주문을 정정합니다.
+
+            Important:
+            - `KIWOOM_USE_MOCK=true`면 모의투자 환경, 아니면 실거래 환경으로 전송됩니다
+            - `confirm_live_order`는 반드시 `true`여야 합니다
             """
             return await order.modify_stock_order(
                 self._client,
@@ -360,6 +491,7 @@ class KiwoomMCPServer:
                 stk_cd=stk_cd,
                 mdfy_qty=mdfy_qty,
                 mdfy_uv=mdfy_uv,
+                dmst_stex_tp=dmst_stex_tp,
                 mdfy_cond_uv=mdfy_cond_uv or "",
             )
 
@@ -369,17 +501,28 @@ class KiwoomMCPServer:
             orig_ord_no: OrderNumber,
             stk_cd: StockCode,
             cncl_qty: NumericText,
+            dmst_stex_tp: Annotated[
+                Literal["KRX", "NXT"],
+                Field(description="국내거래소구분. 기본값은 KRX"),
+            ] = "KRX",
         ) -> dict[str, Any]:
             """
-            LIVE ORDER: API `kt10003` 주식 취소주문.
+            ORDER SUBMISSION: API `kt10003` 주식 취소주문.
 
-            기존 주문을 취소합니다. `cncl_qty="0"`이면 잔량 전체 취소입니다.
+            현재 설정된 Kiwoom 환경의 기존 주문을 취소합니다.
+
+            Important:
+            - `KIWOOM_USE_MOCK=true`면 모의투자 환경, 아니면 실거래 환경으로 전송됩니다
+            - `confirm_live_order`는 반드시 `true`여야 합니다
+            - `dmst_stex_tp`는 기본값 `KRX`를 사용합니다
+            - `cncl_qty="0"`이면 잔량 전체 취소입니다
             """
             return await order.cancel_stock_order(
                 self._client,
                 orig_ord_no=orig_ord_no,
                 stk_cd=stk_cd,
                 cncl_qty=cncl_qty,
+                dmst_stex_tp=dmst_stex_tp,
             )
 
 

@@ -152,6 +152,7 @@ async def place_stock_buy_order(
     stk_cd: str,
     ord_qty: str,
     order_type_code: str,
+    dmst_stex_tp: str = "KRX",
     ord_uv: str = "",
     cond_uv: str = "",
 ) -> dict[str, Any]:
@@ -161,6 +162,7 @@ async def place_stock_buy_order(
         "stk_cd": stk_cd,
         "ord_qty": ord_qty,
         "trde_tp": order_type_code,
+        "dmst_stex_tp": dmst_stex_tp,
     }
     if ord_uv:
         request_data["ord_uv"] = ord_uv
@@ -175,6 +177,7 @@ async def place_stock_buy_order(
             "stk_cd": stk_cd,
             "ord_qty": ord_qty,
             "order_type_code": order_type_code,
+            "dmst_stex_tp": dmst_stex_tp,
             "ord_uv": ord_uv,
             "cond_uv": cond_uv,
         },
@@ -189,6 +192,7 @@ async def place_stock_sell_order(
     stk_cd: str,
     ord_qty: str,
     order_type_code: str,
+    dmst_stex_tp: str = "KRX",
     ord_uv: str = "",
     cond_uv: str = "",
 ) -> dict[str, Any]:
@@ -198,6 +202,7 @@ async def place_stock_sell_order(
         "stk_cd": stk_cd,
         "ord_qty": ord_qty,
         "trde_tp": order_type_code,
+        "dmst_stex_tp": dmst_stex_tp,
     }
     if ord_uv:
         request_data["ord_uv"] = ord_uv
@@ -212,6 +217,7 @@ async def place_stock_sell_order(
             "stk_cd": stk_cd,
             "ord_qty": ord_qty,
             "order_type_code": order_type_code,
+            "dmst_stex_tp": dmst_stex_tp,
             "ord_uv": ord_uv,
             "cond_uv": cond_uv,
         },
@@ -227,6 +233,7 @@ async def modify_stock_order(
     stk_cd: str,
     mdfy_qty: str,
     mdfy_uv: str,
+    dmst_stex_tp: str = "KRX",
     mdfy_cond_uv: str = "",
 ) -> dict[str, Any]:
     """Submit a live stock modify order to Kiwoom."""
@@ -236,6 +243,7 @@ async def modify_stock_order(
         "stk_cd": stk_cd,
         "mdfy_qty": mdfy_qty,
         "mdfy_uv": mdfy_uv,
+        "dmst_stex_tp": dmst_stex_tp,
     }
     if mdfy_cond_uv:
         request_data["mdfy_cond_uv"] = mdfy_cond_uv
@@ -249,6 +257,7 @@ async def modify_stock_order(
             "stk_cd": stk_cd,
             "mdfy_qty": mdfy_qty,
             "mdfy_uv": mdfy_uv,
+            "dmst_stex_tp": dmst_stex_tp,
             "mdfy_cond_uv": mdfy_cond_uv,
         },
         result_key="modify_order_result",
@@ -262,6 +271,7 @@ async def cancel_stock_order(
     orig_ord_no: str,
     stk_cd: str,
     cncl_qty: str,
+    dmst_stex_tp: str = "KRX",
 ) -> dict[str, Any]:
     """Submit a live stock cancel order to Kiwoom."""
 
@@ -272,11 +282,13 @@ async def cancel_stock_order(
             "orig_ord_no": orig_ord_no,
             "stk_cd": stk_cd,
             "cncl_qty": cncl_qty,
+            "dmst_stex_tp": dmst_stex_tp,
         },
         context={
             "orig_ord_no": orig_ord_no,
             "stk_cd": stk_cd,
             "cncl_qty": cncl_qty,
+            "dmst_stex_tp": dmst_stex_tp,
         },
         result_key="cancel_order_result",
         success_message="Live stock cancel order request submitted",
